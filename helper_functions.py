@@ -73,44 +73,44 @@ def neighbor_joining(distances: np.ndarray, labels: list) -> Node:
     
     # Copy the input so the original matrix is not changed.
     distances = np.array(distances, dtype=float, copy=True)
-
+ 
     nodes = [
         Node(label, None, 0.0, None, 0.0)
         for label in labels
     ]
-
+ 
     if len(nodes) == 0:
         raise ValueError("At least one label is required.")
-
+ 
     if len(nodes) == 1:
         return nodes[0]
-
+ 
     node_number = 0
-
+ 
     while len(nodes) > 2:
         n = len(nodes)
         row_sums = distances.sum(axis=1)
-
+ 
         # Calculate the Q matrix.
         q = (
             (n - 2) * distances
             - row_sums[:, None]
             - row_sums[None, :]
         )
-
+ 
         # Prevent a node from joining itself.
         np.fill_diagonal(q, np.inf)
-
+ 
         # Find the pair with the smallest Q value.
         i, j = np.unravel_index(np.argmin(q), q.shape)
-
+ 
         # Calculate branch lengths from the new parent.
         left_distance = (
             distances[i, j] / 2
             + (row_sums[i] - row_sums[j]) / (2 * (n - 2))
         )
         right_distance = distances[i, j] - left_distance
-
+ 
         node_number += 1
         new_node = Node(
             f"NJ_{node_number}",
@@ -119,32 +119,32 @@ def neighbor_joining(distances: np.ndarray, labels: list) -> Node:
             nodes[j],
             float(right_distance),
         )
-
+ 
         # Remove the joined pair.
         remaining = [
             k for k in range(n)
             if k != i and k != j
         ]
-
+ 
         # Calculate distances between the new node and remaining nodes.
         new_distances = (
             distances[i, remaining]
             + distances[j, remaining]
             - distances[i, j]
         ) / 2
-
+ 
         # Append the new node at the end of the matrix.
         updated = np.zeros((n - 1, n - 1))
         updated[:-1, :-1] = distances[np.ix_(remaining, remaining)]
         updated[-1, :-1] = new_distances
         updated[:-1, -1] = new_distances
-
+ 
         distances = updated
         nodes = [nodes[k] for k in remaining] + [new_node]
-
+ 
     # Connect the final two nodes to an artificial root.
     final_distance = float(distances[0, 1] / 2)
-
+ 
     return Node(
         "ROOT",
         nodes[0],
@@ -179,44 +179,46 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
     """
 
     import matplotlib.pyplot as plt
-
+ 
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 6))
-
+ 
+    colors = kwargs.get("colors", {})  # optional {node name: colour}
+ 
     positions = {}
     leaf_number = 0
-
+ 
     def set_positions(node, x):
         nonlocal leaf_number
-
+ 
         # Place leaves at consecutive vertical positions.
         if node.left is None and node.right is None:
             y = leaf_number
             leaf_number += 1
             positions[id(node)] = (x, y)
             return y, 1
-
+ 
         left_y, left_count = set_positions(
             node.left, x + node.left_distance
         )
         right_y, right_count = set_positions(
             node.right, x + node.right_distance
         )
-
+ 
         # Position each parent at the average height of its leaves.
         total_count = left_count + right_count
         y = (
             left_y * left_count + right_y * right_count
         ) / total_count
-
+ 
         positions[id(node)] = (x, y)
         return y, total_count
-
+ 
     set_positions(tree, 0.0)
-
+ 
     def draw(node):
         x, y = positions[id(node)]
-
+ 
         if node.left is None and node.right is None:
             ax.text(
                 x,
@@ -225,12 +227,13 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
                 fontsize=10,
                 va="center",
                 clip_on=False,
+                color=colors.get(node.name, "black"),
             )
             return
-
+ 
         left_x, left_y = positions[id(node.left)]
         right_x, right_y = positions[id(node.right)]
-
+ 
         # Vertical connector between children.
         ax.plot(
             [x, x],
@@ -238,32 +241,32 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
             color="black",
             linewidth=1.5,
         )
-
+ 
         # Horizontal branches show genetic distance.
         ax.plot(
             [x, left_x],
             [left_y, left_y],
-            color="black",
+            color=colors.get(node.left.name, "black"),
             linewidth=1.5,
         )
         ax.plot(
             [x, right_x],
             [right_y, right_y],
-            color="black",
+            color=colors.get(node.right.name, "black"),
             linewidth=1.5,
         )
-
+ 
         draw(node.left)
         draw(node.right)
-
+ 
     draw(tree)
-
+ 
     xs = [position[0] for position in positions.values()]
     width = max(xs) - min(xs)
-
+ 
     if width == 0:
         width = 1.0
-
+ 
     # Short branch leading into the root.
     root_y = positions[id(tree)][1]
     ax.plot(
@@ -272,7 +275,7 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
         color="black",
         linewidth=1.5,
     )
-
+ 
     ax.set_xlim(
         min(xs) - 0.05 * width,
         max(xs) + 0.5 * width,
@@ -280,9 +283,11 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
     ax.set_ylim(-1, leaf_number)
     ax.set_yticks([])
     ax.set_xlabel("Genetic distance")
-
+ 
     for side in ["top", "right", "left"]:
         ax.spines[side].set_visible(False)
+
+    
 
 
 def _find_a_parent_to_node(tree: Node, node: Node) -> tuple:
@@ -333,34 +338,34 @@ def reroot_tree(original_tree: Node, outgroup_node: Node) -> Node:
         Inverted tree with a new root node.
     """
     tree = deepcopy(original_tree)
-
+ 
     parent, child_loc = _find_a_parent_to_node(tree, outgroup_node)
     distance = getattr(parent, f"{child_loc}_distance")
     _remove_child_from_parent(parent, child_loc)
-
+ 
     new_root = Node("new_root", parent, distance / 2, outgroup_node, distance / 2)
     child = parent
-
+ 
     while tree != child:
         parent, child_loc = _find_a_parent_to_node(tree, child)
-
+ 
         distance = getattr(parent, f"{child_loc}_distance")
         _remove_child_from_parent(parent, child_loc)
-
+ 
         empty_side = "left" if child.left is None else "right"
         setattr(child, f"{empty_side}_distance", distance)
         setattr(child, empty_side, parent)
-
+ 
         if tree.name == parent.name:
             break
         child = parent
-
+ 
     other_child_loc = "right" if child_loc == "left" else "left"
     other_child_distance = getattr(parent, f"{other_child_loc}_distance")
-
+ 
     setattr(child, f"{empty_side}_distance", other_child_distance + distance)
     setattr(child, empty_side, getattr(parent, other_child_loc))
-
+ 
     return new_root
 
 
@@ -375,7 +380,23 @@ def sort_children_by_leaves(tree: Node) -> None:
         The root node of the tree.
 
     """
-    raise NotImplementedError()
+    def count(node):
+        if node is None:
+            return 0
+        if node.left is None and node.right is None:
+            return 1
+        return count(node.left) + count(node.right)
+
+    def rec(node):
+        if node is None or (node.left is None and node.right is None):
+            return
+        rec(node.left)
+        rec(node.right)
+        if count(node.left) > count(node.right):      # fewer leaves goes on the left
+            node.left, node.right = node.right, node.left
+            node.left_distance, node.right_distance = node.right_distance, node.left_distance
+
+    rec(tree)
 
 
 def plot_nj_tree_radial(tree: Node, ax: Axes = None, **kwargs) -> None:
