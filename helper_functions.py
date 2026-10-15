@@ -183,7 +183,7 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
     if ax is None:
         _, ax = plt.subplots(figsize=(10, 6))
  
-    colors = kwargs.get("colors", {})  # optional {node name: colour}
+    colors = kwargs.get("colors", {})  
  
     positions = {}
     leaf_number = 0
