@@ -71,9 +71,87 @@ def neighbor_joining(distances: np.ndarray, labels: list) -> Node:
 
     """
     
-    self.tree = Node()
+    # Copy the input so the original matrix is not changed.
+    distances = np.array(distances, dtype=float, copy=True)
 
-    raise NotImplementedError()
+    nodes = [
+        Node(label, None, 0.0, None, 0.0)
+        for label in labels
+    ]
+
+    if len(nodes) == 0:
+        raise ValueError("At least one label is required.")
+
+    if len(nodes) == 1:
+        return nodes[0]
+
+    node_number = 0
+
+    while len(nodes) > 2:
+        n = len(nodes)
+        row_sums = distances.sum(axis=1)
+
+        # Calculate the Q matrix.
+        q = (
+            (n - 2) * distances
+            - row_sums[:, None]
+            - row_sums[None, :]
+        )
+
+        # Prevent a node from joining itself.
+        np.fill_diagonal(q, np.inf)
+
+        # Find the pair with the smallest Q value.
+        i, j = np.unravel_index(np.argmin(q), q.shape)
+
+        # Calculate branch lengths from the new parent.
+        left_distance = (
+            distances[i, j] / 2
+            + (row_sums[i] - row_sums[j]) / (2 * (n - 2))
+        )
+        right_distance = distances[i, j] - left_distance
+
+        node_number += 1
+        new_node = Node(
+            f"NJ_{node_number}",
+            nodes[i],
+            float(left_distance),
+            nodes[j],
+            float(right_distance),
+        )
+
+        # Remove the joined pair.
+        remaining = [
+            k for k in range(n)
+            if k != i and k != j
+        ]
+
+        # Calculate distances between the new node and remaining nodes.
+        new_distances = (
+            distances[i, remaining]
+            + distances[j, remaining]
+            - distances[i, j]
+        ) / 2
+
+        # Append the new node at the end of the matrix.
+        updated = np.zeros((n - 1, n - 1))
+        updated[:-1, :-1] = distances[np.ix_(remaining, remaining)]
+        updated[-1, :-1] = new_distances
+        updated[:-1, -1] = new_distances
+
+        distances = updated
+        nodes = [nodes[k] for k in remaining] + [new_node]
+
+    # Connect the final two nodes to an artificial root.
+    final_distance = float(distances[0, 1] / 2)
+
+    return Node(
+        "ROOT",
+        nodes[0],
+        final_distance,
+        nodes[1],
+        final_distance,
+    )
 
 
 def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
