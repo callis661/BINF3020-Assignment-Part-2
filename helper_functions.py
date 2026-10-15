@@ -178,7 +178,111 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
 
     """
 
-    return ax
+    import matplotlib.pyplot as plt
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 6))
+
+    positions = {}
+    leaf_number = 0
+
+    def set_positions(node, x):
+        nonlocal leaf_number
+
+        # Place leaves at consecutive vertical positions.
+        if node.left is None and node.right is None:
+            y = leaf_number
+            leaf_number += 1
+            positions[id(node)] = (x, y)
+            return y, 1
+
+        left_y, left_count = set_positions(
+            node.left, x + node.left_distance
+        )
+        right_y, right_count = set_positions(
+            node.right, x + node.right_distance
+        )
+
+        # Position each parent at the average height of its leaves.
+        total_count = left_count + right_count
+        y = (
+            left_y * left_count + right_y * right_count
+        ) / total_count
+
+        positions[id(node)] = (x, y)
+        return y, total_count
+
+    set_positions(tree, 0.0)
+
+    def draw(node):
+        x, y = positions[id(node)]
+
+        if node.left is None and node.right is None:
+            ax.text(
+                x,
+                y,
+                f"  {node.name}",
+                fontsize=10,
+                va="center",
+                clip_on=False,
+            )
+            return
+
+        left_x, left_y = positions[id(node.left)]
+        right_x, right_y = positions[id(node.right)]
+
+        # Vertical connector between children.
+        ax.plot(
+            [x, x],
+            [left_y, right_y],
+            color="black",
+            linewidth=1.5,
+        )
+
+        # Horizontal branches show genetic distance.
+        ax.plot(
+            [x, left_x],
+            [left_y, left_y],
+            color="black",
+            linewidth=1.5,
+        )
+        ax.plot(
+            [x, right_x],
+            [right_y, right_y],
+            color="black",
+            linewidth=1.5,
+        )
+
+        draw(node.left)
+        draw(node.right)
+
+    draw(tree)
+
+    xs = [position[0] for position in positions.values()]
+    width = max(xs) - min(xs)
+
+    if width == 0:
+        width = 1.0
+
+    # Short branch leading into the root.
+    root_y = positions[id(tree)][1]
+    ax.plot(
+        [-0.02 * width, 0],
+        [root_y, root_y],
+        color="black",
+        linewidth=1.5,
+    )
+
+    ax.set_xlim(
+        min(xs) - 0.05 * width,
+        max(xs) + 0.5 * width,
+    )
+    ax.set_ylim(-1, leaf_number)
+    ax.set_yticks([])
+    ax.set_xlabel("Genetic distance")
+
+    for side in ["top", "right", "left"]:
+        ax.spines[side].set_visible(False)
 
 
 def _find_a_parent_to_node(tree: Node, node: Node) -> tuple:
