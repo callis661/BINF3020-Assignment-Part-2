@@ -300,6 +300,23 @@ def plot_nj_tree(tree: Node, ax: Axes = None, **kwargs) -> None:
     for side in ["top", "right", "left"]:
         ax.spines[side].set_visible(False)
 
+def _find_a_parent_to_node(tree: Node, node: Node) -> tuple:
+    """Utility function for reroot_tree"""
+    stack = [tree]
+
+    while len(stack) > 0:
+
+        current_node = stack.pop()
+        if node.name == current_node.left.name:
+            return current_node, "left"
+        elif node.name == current_node.right.name:
+            return current_node, "right"
+
+        stack += [
+            n for n in [current_node.left, current_node.right] if n.left is not None
+        ]
+
+    return None
 
 def _remove_child_from_parent(parent_node: Node, child_location: str) -> None:
     """Utility function for reroot_tree"""
